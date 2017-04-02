@@ -1,13 +1,15 @@
 import socket
 import sys
 import os
+import mimetypes
+import urllib.parse
 
 class Server(object):
 
     address_family = socket.AF_INET
     socket_type = socket.SOCK_STREAM
-    request_queue_size = 1
-    directory_path = os.path.dirname(os.path.abspath(__file__))
+    request_queue_size = 5
+    top_directory_path = os.path.dirname(os.path.abspath(__file__))
     response = []
 
     def __init__(self, host='', port=8000):
@@ -22,11 +24,11 @@ class Server(object):
         self.listen_socket.bind((self.HOST, self.PORT))
         self.listen_socket.listen(self.request_queue_size)
 
-        self.headers = """\
-        HTTP/1.1 200 OK\n
-        Content-Type: text/html
+        self.headers = b"""\
+HTTP/1.1 200 OK
+Content-Type: text/html
 
-        """
+"""
         print('Serving HTTP on port {}'.format(self.PORT))
 
     def serve_forever(self):
@@ -34,20 +36,86 @@ class Server(object):
             connection, adress = self.listen_socket.accept()
             request_headers = connection.recv(1024)
             request = request_headers.decode().split('\n\r')[0].split('\r')[0]
-            for index in 'index.html', 'index.htm':
-                index_path = os.path.join(directory_path, index)
-                if os.path.exists(index_path):
-                    response = 
+            print(request)
+            try:
+                response = self.handle_request(request)
+            except:
+                break
 
-
-            response = self.handle_request(request)
-
-            connection.sendall(response.encode())
+            connection.sendall(response)
             connection.close()
 
     def handle_request(self, request):
-        pass
+        try:
+            request_path = request.split(' ')[1]
+        except:
+            pass
+
+
+        request_path = urllib.parse.unquote(request_path)
+        response = ''
+        if os.path.isdir('.' + request_path):
+            for index in 'index.html', 'index.htm':
+                    print('check for index...')
+                    index_path = os.path.join('.' + request_path, index)
+                    print(index_path)
+                    if os.path.exists(index_path):
+                        print('index is here!')
+                        file = open(index_path, 'rb').read()
+                        response = self.headers + file
+                        break
+            else:
+                response = self.headers + self.get_directory(request_path).encode()
+        else:
+            file_path = os.path.join(self.top_directory_path, request_path[1:])
+            if os.path.exists(file_path):
+                content_type, content_encoding = self.find_type(request_path)
+                if content_type is None:
+                    content_type = 'text/plain'
+
+                file = open(file_path, 'rb')
+
+                response = """\
+HTTP/1.1 200 OK
+Content-Type: {}
+Content-encoding: {}
+
+""".format(content_type, content_encoding)
+                response = response.encode() + file.read()
+            else:
+                response = b'<h1>Sorry, no such file</h1>\n<a href="/">Go Back</a>'
+
+        return response
+
+    def get_directory(self, request_path):
+        directory_html_list = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>Listing of {0}</title>
+<h1>Listing of  {0}</h1>
+<hr>
+<body>
+<ul>
+""".format(request_path)
+
+        if request_path.startswith('/'):
+            request_path = request_path[1:]
+
+        current_path = os.path.join(self.top_directory_path, request_path)
+        directory_items = os.listdir(current_path)
+        for name in directory_items:
+            item = "<li><a href='{0}'>{0}</a></li>\n".format(name)
+            directory_html_list += item
+
+        return directory_html_list + '</ul></body></html>'
+
+    def find_type(self, path):
+        content_type = mimetypes.guess_type(path)
+        return content_type
         
+
+
 
 
 
