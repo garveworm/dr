@@ -15,7 +15,6 @@ class Server(object):
     def __init__(self, host='', port=8000):
         self.HOST = host
         self.PORT = port
-        # Create socket
         self.listen_socket = listen_socket = socket.socket(
             self.address_family,
             self.socket_type
@@ -51,16 +50,12 @@ Content-Type: text/html
         except:
             pass
 
-
         request_path = urllib.parse.unquote(request_path)
         response = ''
         if os.path.isdir('.' + request_path):
             for index in 'index.html', 'index.htm':
-                    print('check for index...')
                     index_path = os.path.join('.' + request_path, index)
-                    print(index_path)
                     if os.path.exists(index_path):
-                        print('index is here!')
                         file = open(index_path, 'rb').read()
                         response = self.headers + file
                         break
@@ -71,7 +66,7 @@ Content-Type: text/html
             if os.path.exists(file_path):
                 content_type, content_encoding = self.find_type(request_path)
                 if content_type is None:
-                    content_type = 'text/plain'
+                    content_type = 'application/octet-stream'
 
                 file = open(file_path, 'rb')
 
@@ -101,27 +96,31 @@ Content-encoding: {}
 
         if request_path.startswith('/'):
             request_path = request_path[1:]
+        print("Request ", request_path)
 
         current_path = os.path.join(self.top_directory_path, request_path)
+        print("CURRENT PATH IS ", current_path)
         directory_items = os.listdir(current_path)
         for name in directory_items:
-            item = "<li><a href='{0}'>{0}</a></li>\n".format(name)
+
+            path_to_name = os.path.join(current_path, name)
+            rel_path = path_to_name.split(self.top_directory_path)[1]
+            print('path to name', path_to_name)
+            print(rel_path)
+
+            if os.path.isfile(name) and '.' not in name:
+                print("File without and extention")
+                item = "<li><a href='{}' download>{}</a></li>\n".format(rel_path, name)
+            else:
+                item = "<li><a href='{}'>{}</a></li>\n".format(rel_path, name)
             directory_html_list += item
 
-        return directory_html_list + '</ul></body></html>'
+        return directory_html_list + '</ul><hr></body></html>'
 
     def find_type(self, path):
         content_type = mimetypes.guess_type(path)
         return content_type
         
-
-
-
-
-
-
-    
-
 if __name__ == '__main__':
     # Determine the port number
     if len(sys.argv) > 1:
